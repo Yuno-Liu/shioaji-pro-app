@@ -174,23 +174,61 @@ pnpm dev
 
 ## Docker 一鍵快速部署 Docker Quick Start
 
-本專案提供輕量化多階段 Dockerfile 與 Docker Compose 配置，無需在本地安裝 Node.js 或 pnpm，即可一鍵啟動整合 Nginx 與反向代理的完整交易終端：
+本專案提供輕量化多階段 Dockerfile 與 Docker Compose 配置，無需在本地安裝 Node.js 或 pnpm，即可一鍵啟動整合 Nginx 反向代理與 Server-Sent Events (SSE) 行情串流的完整交易終端：
 
-### 1. 一鍵啟動
+### 1. 完整啟動流程（四步驟）
 
-確認本機已安裝 [Docker](https://www.docker.com/) 與 Docker Compose，在專案目錄執行：
-
+#### 步驟 1：準備環境變數設定檔 `.env`
+在專案根目錄建立或編輯 `.env`（可複製 `.env.example`）：
 ```sh
-# 構建並於背景啟動終端服務
-docker compose up -d
+cp .env.example .env
+```
+填入您的永豐與玉山相關設定：
+```env
+# 永豐證券 Shioaji 行情金鑰（數據來源）
+SJ_API_KEY=your_sinopac_api_key
+SJ_SEC_KEY=your_sinopac_secret_key
 
-# 查看即時日誌
-docker compose logs -f
+# 玉山證券下單帳號（若使用玉山下單）
+VITE_ESUN_ACCOUNT=88400664718
+VITE_ESUN_BROKER_ID=8840
+
+# Docker 服務設定
+PORT=5173
+API_TARGET=http://host.docker.internal:8080
 ```
 
-啟動後直接在瀏覽器打開 **[http://localhost:5173](http://localhost:5173)** 即可開始使用！
+#### 步驟 2：啟動本機 Shioaji 行情伺服器（負責數據來源）
+```sh
+# 安裝並啟動 Shioaji 服務（預設模擬模式跑在 8080 埠，供 Docker 容器連線）
+pip install shioaji
+shioaji server start
+```
 
-### 2. 環境變數與自訂設定
+#### 步驟 3：使用 Docker 一鍵啟動交易終端
+```sh
+# 構建映像檔並於背景啟動容器
+docker compose up -d --build
+```
+
+#### 步驟 4：開啟瀏覽器
+在瀏覽器打開 **[http://localhost:5173](http://localhost:5173)**，即可進入交易終端進行看盤與下單！
+
+---
+
+### 2. Docker 常用管理指令速查
+
+| 操作情境 | Docker Compose 指令 | 原生 Docker CLI 指令 |
+|---|---|---|
+| **構建並背景啟動** | `docker compose up -d --build` | `docker build -t shioaji-pro-app . && docker run -d --name shioaji-pro-app -p 5173:80 --add-host=host.docker.internal:host-gateway -e API_TARGET=http://host.docker.internal:8080 shioaji-pro-app` |
+| **查看容器運行狀態** | `docker compose ps` | `docker ps -f name=shioaji-pro-app` |
+| **查看即時日誌** | `docker compose logs -f` | `docker logs -f shioaji-pro-app` |
+| **重啟終端服務** | `docker compose restart` | `docker restart shioaji-pro-app` |
+| **停止並移除容器** | `docker compose down` | `docker stop shioaji-pro-app && docker rm shioaji-pro-app` |
+
+---
+
+### 3. 環境變數與自訂設定
 
 可在 `.env` 檔案中自訂連線設定，或於啟動時直接指定環境變數：
 
@@ -199,15 +237,13 @@ docker compose logs -f
 | `PORT` | `5173` | 宿主機對外暴露之 Web 終端連接埠 |
 | `API_TARGET` | `http://host.docker.internal:8080` | 後端 Shioaji 服務連線網址（容器內部透過 `host.docker.internal` 連線宿主機 8080 埠） |
 
-例如自訂連接埠為 8080 或連接獨立主機：
+#### 範例：自訂連接埠為 8080 或連接遠端伺服器
 ```sh
-PORT=8080 API_TARGET=http://192.168.1.100:8080 docker compose up -d
-```
+# 使用 Docker Compose
+PORT=8080 API_TARGET=http://192.168.1.100:8080 docker compose up -d --build
 
-### 3. 停止與清理
-
-```sh
-docker compose down
+# 或使用原生 Docker CLI
+docker run -d --name shioaji-pro-app -p 8080:80 -e API_TARGET=http://192.168.1.100:8080 shioaji-pro-app
 ```
 
 ## 玉山證券 (E.SUN Securities) 下單前準備與完整設定指南
