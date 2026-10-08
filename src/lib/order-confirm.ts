@@ -11,6 +11,7 @@ import { fetchInfo } from './shioaji';
 import { getAccountState } from './account-store';
 import { captureServerMode, currentServerInfoSequence, knownServerInfo, serverInfoFreshSince, SERVER_MODE_CHANGED_MESSAGE, subscribeServerInfo, type ServerModeGuard } from './server-info-store';
 import { getApiBase } from './runtime';
+import { isEsunBroker, ESUN_BROKER_NAME } from './esun';
 import type { Action } from './types/order';
 import type { Account } from './types/portfolio';
 
@@ -109,7 +110,8 @@ function currentSimulation(): boolean | null {
 export function accountConfirmLabel(account: Pick<Account, 'broker_id' | 'account_id'>): string {
     const id = account.account_id;
     const masked = id.length > 4 ? `${'*'.repeat(id.length - 4)}${id.slice(-4)}` : id;
-    return `${account.broker_id}-${masked}`;
+    const broker = isEsunBroker(account.broker_id) ? ESUN_BROKER_NAME : account.broker_id;
+    return `${broker}-${masked}`;
 }
 
 function selectedAccountLabel(unit: string): string | undefined {

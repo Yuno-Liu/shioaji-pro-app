@@ -11,6 +11,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@esun/trade": "file:esun-trade-2.2.0.tgz",
         "@statsig/js-client": "^3.33.2",
         "@tauri-apps/api": "^2.11.0",
         "@tauri-apps/plugin-dialog": "^2.7.1",
@@ -48,5 +49,10 @@
         "typescript": "~5.9.3",
         "vite": "^8.0.1",
         "vitest": "^4.1.10"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "keytar"
+        ]
     }
 }

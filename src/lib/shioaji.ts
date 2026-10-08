@@ -10,6 +10,7 @@ import { createCancelBatch, readMark, sharedAuthoritativeTrades, verifyCancellat
 import { observeMarketSnapshots } from './market-snapshot-store';
 import { observeTradeResponse } from './trade-observations';
 import { beginServerInfoRequest, observeServerInfo } from './server-info-store';
+import { esunTradeService, isEsunAccount } from './esun';
 // src/lib/shioaji.ts
 
 import { accountFor, getAccountState } from './account-store';
@@ -117,7 +118,24 @@ export function fetchInfo() {
 }
 
 export function fetchAccounts() {
-    return apiGet<Account[]>('/api/v1/auth/accounts');
+    return apiGet<Account[]>('/api/v1/auth/accounts').then(
+        accounts => {
+            const esunAccounts = esunTradeService.getAccounts();
+            if (esunAccounts.length === 0) return accounts;
+            const merged = [...accounts];
+            for (const ea of esunAccounts) {
+                if (!merged.some(a => a.broker_id === ea.broker_id && a.account_id === ea.account_id)) {
+                    merged.push(ea);
+                }
+            }
+            return merged;
+        },
+        error => {
+            const esunAccounts = esunTradeService.getAccounts();
+            if (esunAccounts.length > 0) return esunAccounts;
+            throw error;
+        },
+    );
 }
 
 // CA expiry for a person_id — production orders fail (400) without an active,
@@ -819,11 +837,16 @@ export function placeStockOrder(
     account?: Account,
     opts?: { agentInitiated?: boolean; agentCallId?: string; agentAuto?: boolean; beforeDispatch?: () => void; onResponse?: (res: Response) => void },
 ) {
+    const selected = account ?? accountFor('S');
+    if (selected && isEsunAccount(selected)) {
+        return esunTradeService
+            .placeStockOrder(contract, order, selected, opts)
+            .then(trade => observeTradeResponse(trade, selected));
+    }
     // 零股不支援的組合（融資券／當沖／市價／IOC／超過 999 股）與整股信用規則
     // （融券買進、不可當沖的當沖先賣）一律在送出前擋下（#204）
     const problem = stockOrderProblem({ ...order, day_trade: (contract as { day_trade?: string }).day_trade });
     if (problem) return Promise.reject(Object.assign(new Error(problem), { mutationNotStarted: true as const }));
-    const selected = account ?? accountFor('S');
     return sendOrderMutation<Trade>('/api/v1/order/place_order', {
         contract: contractKey(contract),
         stock_order: { ...order, account: selected },
@@ -882,7 +905,7 @@ async function prepareOrderMutation(tradeId: string): Promise<{ base: string; tr
     if (!account) refuse('缺少已驗證的委託帳戶，未送出改刪單');
     const futures = ['FUT', 'OPT'].includes(trade.contract.security_type ?? '');
     if (account!.account_type !== (futures ? 'F' : 'S')) refuse('商品與委託帳戶不符，未送出改刪單');
-    if (hasOrdersBaseline()) return { base, tradeId, trade, account: account!, tradingState };
+    if (hasOrdersBaseline() || isEsunAccount(account)) return { base, tradeId, trade, account: account!, tradingState };
     const seqno = trade.order.seqno?.trim();
     const ordno = trade.order.ordno?.trim();
     if (!seqno && !ordno) refuse('伺服器委託基準未建立且委託缺少序號，請先手動更新委託；未送出改刪單');
@@ -1003,6 +1026,15 @@ function observeCancel(
     return observeTradeMutation(tradeId, async () => {
         const target = await prepareOrderMutation(tradeId);
         const { account } = target;
+        if (isEsunAccount(account)) {
+            const cancelled = await esunTradeService.cancelOrder(
+                target.trade.contract,
+                target.trade.order,
+                account,
+                { beforeDispatch: beforeSend },
+            );
+            return markConfirmedCancellation({ ...cancelled, account });
+        }
         const { cancelCacheTrusted, locallyCancelled } = target.tradingState;
         if (target.base !== getApiBase()) throw Object.assign(new Error('伺服器已切換，未送出改刪單'), { mutationNotStarted: true });
         await sendOrderMutation<Trade>(
@@ -1048,6 +1080,14 @@ function observeCancel(
 export function updateOrderPrice(tradeId: string, price: number) {
     return observeTradeMutation(tradeId, async () => {
         const target = await prepareOrderMutation(tradeId);
+        if (isEsunAccount(target.account)) {
+            return esunTradeService.updateOrderPrice(
+                target.trade.contract,
+                target.trade.order,
+                price,
+                target.account,
+            );
+        }
         if (target.base !== getApiBase()) throw Object.assign(new Error('伺服器已切換，未送出改刪單'), { mutationNotStarted: true });
         // 零股委託只能減量（#204）— 任何改價路徑都在送出前擋下
         if (isOddLot(target.trade.order.order_lot)) throw Object.assign(new Error(ODD_LOT_NO_PRICE_UPDATE), { mutationNotStarted: true });
@@ -1061,6 +1101,14 @@ export function updateOrderPrice(tradeId: string, price: number) {
 export function updateOrderQty(tradeId: string, quantity: number) {
     return observeTradeMutation(tradeId, async () => {
         const target = await prepareOrderMutation(tradeId);
+        if (isEsunAccount(target.account)) {
+            return esunTradeService.updateOrderQty(
+                target.trade.contract,
+                target.trade.order,
+                quantity,
+                target.account,
+            );
+        }
         if (target.base !== getApiBase()) throw Object.assign(new Error('伺服器已切換，未送出改刪單'), { mutationNotStarted: true });
         noteMutationIntent(tradeId, { kind: 'qty', quantity });
         return sendOrderMutation<Trade>('/api/v1/order/update_qty', {

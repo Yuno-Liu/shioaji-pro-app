@@ -6,6 +6,7 @@ import { canTrade } from '../lib/account-tradable';
 // 寬版兩欄（左=資金＋交割＋額度、右=損益＋預收）、窄版單欄堆疊。
 
 import { accountMatches } from '../lib/flash-account';
+import { isEsunBroker } from '../lib/esun';
 import { maskAccountId, usePrivacyMode } from '../lib/privacy';
 import { useAccounts } from '../lib/account-store';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -627,7 +628,7 @@ export function AccountPane(props: AccountPaneProps) {
     return <>{visible.map(account => {
         const id = `${account.account_type}:${account.broker_id}:${account.account_id}`;
         return <section key={id}>
-            <h3>{account.account_type === 'F' ? '期貨' : '證券'} {account.broker_id}-{maskAccountId(account.account_id, privacy)}</h3>
+            <h3>{account.account_type === 'F' ? '期貨' : '證券'} {isEsunBroker(account.broker_id) ? '玉山' : account.broker_id}-{maskAccountId(account.account_id, privacy)}</h3>
             <AccountPaneContent {...props} scopeAccount={account}
                 positions={props.positions.filter(p => accountMatches(p.account, account))}
                 onRefreshControls={callbacks[id]} />

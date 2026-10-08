@@ -28,6 +28,7 @@ import {
     useAccounts,
 } from '../lib/account-store';
 import { accountConfirmLabel, requestOrderConfirm } from '../lib/order-confirm';
+import { isEsunBroker } from '../lib/esun';
 import {
     ACCOUNT_CHANGED_MESSAGE,
     captureSelectedAccount,
@@ -744,7 +745,7 @@ export function OrderTicket({
                                                     style={{ width: 11 }}
                                                 />
                                             )}
-                                            {acctTag} {a.broker_id}-
+                                            {acctTag} {isEsunBroker(a.broker_id) ? '玉山' : a.broker_id}-
                                             {maskAccountId(a.account_id, priv)}
                                             （{maskName(a.username, priv)}）
                                         </button>
@@ -1164,7 +1165,7 @@ export function OrderTicket({
                                     className={styles.splitAcctLabel}
                                     title={maskName(a.username, priv)}
                                 >
-                                    {acctTag} {a.broker_id}-
+                                    {acctTag} {isEsunBroker(a.broker_id) ? '玉山' : a.broker_id}-
                                     {maskAccountId(a.account_id, priv)}
                                 </span>
                                 {splitMode === 'ratio' ? (
