@@ -18,7 +18,7 @@ import {
 
 /** 判斷 broker_id 是否為玉山證券代號或名稱 */
 export function isEsunBroker(brokerId?: string | null): boolean {
-    if (!brokerId) return false;
+    if (!brokerId || typeof brokerId !== 'string') return false;
     const b = brokerId.trim().toUpperCase();
     return (
         b === ESUN_BROKER_CODE ||

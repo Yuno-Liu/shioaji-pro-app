@@ -8,7 +8,8 @@
         "dev": "vite",
         "build": "tsc -b && vite build",
         "test": "vitest run",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "esun-bridge": "node server/esun-bridge.cjs"
     },
     "dependencies": {
         "@esun/trade": "file:esun-trade-2.2.0.tgz",

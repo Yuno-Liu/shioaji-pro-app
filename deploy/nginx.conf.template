@@ -5,6 +5,11 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Docker 內建 DNS；ipv6=off 避免 host.docker.internal 解析出容器無法連線的
+    # IPv6 位址（Network unreachable → /api 回 500/502）。upstream 以變數指定，
+    # 讓 nginx 在請求時才解析，esun-bridge 尚未啟動也不會讓 nginx 開不起來。
+    resolver 127.0.0.11 ipv6=off valid=30s;
+
     # Gzip compression
     gzip on;
     gzip_vary on;
@@ -24,9 +29,23 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # 玉山證券下單橋接服務（esun-bridge 容器）
+    location /esun/ {
+        set $esun_upstream ${ESUN_BRIDGE_TARGET};
+        proxy_pass $esun_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 60s;
+        # 下單請求不可自動重送
+        proxy_next_upstream off;
+    }
+
     # Proxy API & Server-Sent Events (SSE) to Shioaji Server
     location /api/ {
-        proxy_pass ${API_TARGET};
+        set $api_upstream ${API_TARGET};
+        proxy_pass $api_upstream;
         proxy_http_version 1.1;
 
         proxy_set_header Host $host;

@@ -3,14 +3,36 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     container_name: shioaji-pro-app
     restart: unless-stopped
+    depends_on:
+      - esun-bridge
     ports:
       # 將主機端口（預設 5173）映射至容器內的 Nginx 80 埠
       - "${PORT:-5173}:80"
     environment:
-      # 後端 Shioaji 服務位址（預設連線至宿主機上的 8080 埠）
+      # 永豐 Shioaji 服務位址（行情資料來源；預設連線至宿主機上的 8080 埠）
       - API_TARGET=${API_TARGET:-http://host.docker.internal:8080}
+      # 玉山下單橋接服務（同一 compose 網路內）
+      - ESUN_BRIDGE_TARGET=http://esun-bridge:8090
     extra_hosts:
       # 支援 Linux, Windows, macOS 容器透過 host.docker.internal 存取宿主機
       - "host.docker.internal:host-gateway"
+
+  esun-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: bridge
+    container_name: esun-bridge
+    restart: unless-stopped
+    # 不對外開 port：只有 shioaji-pro-app 的 nginx 可透過 /esun/ 存取
+    environment:
+      # 玉山證券登入密碼與憑證密碼（寫在專案根目錄 .env，勿提交 Git）
+      - ESUN_PASSWORD=${ESUN_PASSWORD:-}
+      - ESUN_CERT_PASSWORD=${ESUN_CERT_PASSWORD:-}
+    volumes:
+      # config.ini 內 [Cert] Path = ./certs/xxx.p12 會以 config.ini 所在目錄解析
+      - ./config.ini:/app/esun/config.ini:ro
+      - ./certs:/app/esun/certs:ro

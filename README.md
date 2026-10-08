@@ -176,42 +176,55 @@ pnpm dev
 
 本專案提供輕量化多階段 Dockerfile 與 Docker Compose 配置，無需在本地安裝 Node.js 或 pnpm，即可一鍵啟動整合 Nginx 反向代理與 Server-Sent Events (SSE) 行情串流的完整交易終端：
 
-### 1. 完整啟動流程（四步驟）
+### 1. 完整啟動流程（五步驟）
 
-#### 步驟 1：準備環境變數設定檔 `.env`
+#### 步驟 1：準備玉山證券設定檔與憑證（如有使用玉山下單）
+若您使用玉山證券下單，需準備設定檔與憑證供 Docker 容器掛載讀取：
+1. 將本專案根目錄的 `esun-config.ini.example` 複製為 `config.ini`，並填寫 API Key/Secret 與玉山證券帳號。
+2. 建立 `certs` 資料夾，並將您的玉山電腦下單憑證（`.p12` 或 `.pfx`）放入該資料夾中（例如：`certs/your_esun_cert.p12`）。並在 `config.ini` 中正確設定該憑證的路徑。
+
+#### 步驟 2：準備環境變數設定檔 `.env`
 在專案根目錄建立或編輯 `.env`（可複製 `.env.example`）：
 ```sh
 cp .env.example .env
 ```
-填入您的永豐與玉山相關設定：
+填入您的永豐行情金鑰，與玉山下單所需的環境變數（若無玉山下單需求可忽略 ESUN 開頭的變數）：
 ```env
 # 永豐證券 Shioaji 行情金鑰（數據來源）
 SJ_API_KEY=your_sinopac_api_key
 SJ_SEC_KEY=your_sinopac_secret_key
 
-# 玉山證券下單帳號（若使用玉山下單）
-VITE_ESUN_ACCOUNT=88400664718
-VITE_ESUN_BROKER_ID=8840
+# 玉山證券下單帳號（若使用玉山下單，提供前端預設帶入使用）
+VITE_ESUN_ACCOUNT=96001234567
+VITE_ESUN_BROKER_ID=9600
+VITE_ESUN_USERNAME=玉山證券
+
+# 玉山證券 Node.js SDK 自動化登入變數 (供 Bridge 服務讀取，免交互輸入密碼)
+ESUN_CONFIG_PATH=/app/config.ini
+ESUN_CERT_PASSWORD=your_cert_password
+ESUN_PASSWORD=your_trading_password
 
 # Docker 服務設定
 PORT=5173
 API_TARGET=http://host.docker.internal:8080
 ```
 
-#### 步驟 2：啟動本機 Shioaji 行情伺服器（負責數據來源）
+#### 步驟 3：啟動本機 Shioaji 行情伺服器（負責數據來源）
+永豐 Shioaji API 負責提供即時行情，需在本機或遠端啟動（此為獨立服務）：
 ```sh
 # 安裝並啟動 Shioaji 服務（預設模擬模式跑在 8080 埠，供 Docker 容器連線）
 pip install shioaji
 shioaji server start
 ```
 
-#### 步驟 3：使用 Docker 一鍵啟動交易終端
+#### 步驟 4：使用 Docker 一鍵啟動交易終端
+透過 Docker Compose 同時啟動前端 Nginx 服務與玉山 Bridge 服務：
 ```sh
 # 構建映像檔並於背景啟動容器
 docker compose up -d --build
 ```
 
-#### 步驟 4：開啟瀏覽器
+#### 步驟 5：開啟瀏覽器
 在瀏覽器打開 **[http://localhost:5173](http://localhost:5173)**，即可進入交易終端進行看盤與下單！
 
 ---

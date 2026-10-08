@@ -5,4 +5,5 @@ export * from './order-mapping';
 export * from './adapter';
 export * from './mock-driver';
 export * from './sdk-driver';
+export * from './http-driver';
 export * from './service';

@@ -117,8 +117,14 @@ export function fetchInfo() {
     });
 }
 
+function connectEsunBridge(): Promise<unknown> {
+    // Vitest：不探測真實 /esun（測試以 setDriver/registerAccount 自行注入）
+    if (import.meta.env?.MODE === 'test') return Promise.resolve(null);
+    return esunTradeService.connectBridge().catch(() => null);
+}
+
 export function fetchAccounts() {
-    return apiGet<Account[]>('/api/v1/auth/accounts').then(
+    return connectEsunBridge().then(() => apiGet<Account[]>('/api/v1/auth/accounts')).then(
         accounts => {
             const esunAccounts = esunTradeService.getAccounts();
             if (esunAccounts.length === 0) return accounts;
@@ -1126,14 +1132,29 @@ export interface AccountSelector {
     account_id: string;
 }
 
+// 玉山帳戶不走永豐 sidecar：委託查詢改由 esun-bridge，其餘帳務暫回空集合
+const ESUN_EMPTY_LIST_PATHS = new Set([
+    '/api/v1/portfolio/position_unit',
+    '/api/v1/portfolio/settlements',
+]);
+
 function accountQueryPost<T>(path: string, type: AccountTypeName, selector?: AccountSelector, extra: Record<string, unknown> = {}): Promise<T> {
     const query = createAccountQuery();
-    return query.read(type, selector, account => apiPost<T>(path, {
-        ...extra,
-        account_type: type,
-        broker_id: account.broker_id,
-        account_id: account.account_id,
-    }, { beforeDispatch: query.assertCurrent }));
+    return query.read(type, selector, account => {
+        if (isEsunAccount(account as Account)) {
+            if (path === '/api/v1/order/trades') {
+                return esunTradeService.fetchTrades(account as Account) as Promise<T>;
+            }
+            if (ESUN_EMPTY_LIST_PATHS.has(path)) return Promise.resolve([] as T);
+            return Promise.reject(new Error('玉山證券帳戶暫不支援此查詢'));
+        }
+        return apiPost<T>(path, {
+            ...extra,
+            account_type: type,
+            broker_id: account.broker_id,
+            account_id: account.account_id,
+        }, { beforeDispatch: query.assertCurrent });
+    });
 }
 
 export interface FetchTradesOptions {

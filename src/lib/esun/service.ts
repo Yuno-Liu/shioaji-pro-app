@@ -13,6 +13,16 @@ import {
     validateEsunStockOrder,
 } from './order-mapping';
 import { ESUN_BROKER_CODE, ESUN_BROKER_NAME, type EsunClientConfig } from './types';
+import { HttpEsunDriver, UnavailableEsunDriver, type EsunBridgeHealth } from './http-driver';
+
+/** esun-bridge 位址：預設同源（Docker 由 nginx、dev 由 Vite proxy 轉發 /esun） */
+function bridgeBase(): string {
+    try {
+        return String((import.meta as any).env?.VITE_ESUN_BRIDGE_BASE ?? '').replace(/\/+$/, '');
+    } catch {
+        return '';
+    }
+}
 
 function mutationNotStartedError(message: string): Error & { mutationNotStarted: true } {
     return Object.assign(new Error(message), {
@@ -20,14 +30,56 @@ function mutationNotStartedError(message: string): Error & { mutationNotStarted:
     });
 }
 
+function defaultDriver(): IEsunTradeDriver {
+    try {
+        const env = (import.meta as any).env;
+        if (env?.VITE_ESUN_DRIVER === 'mock') return new MockEsunDriver();
+    } catch {
+        // non-vite environment
+    }
+    return new UnavailableEsunDriver();
+}
+
 export class EsunTradeService {
     private driver: IEsunTradeDriver;
     private accounts: Account[] = [];
     private config: Partial<EsunClientConfig> = {};
+    private bridgeProbe: Promise<EsunBridgeHealth | null> | null = null;
+    private bridgeHealth: EsunBridgeHealth | null = null;
 
     constructor(initialDriver?: IEsunTradeDriver) {
-        this.driver = initialDriver ?? new MockEsunDriver();
+        this.driver = initialDriver ?? defaultDriver();
         this.initFromEnv();
+    }
+
+    /**
+     * 連線 esun-bridge（同源 /esun/*）：成功即改用 HttpEsunDriver 並註冊玉山帳戶。
+     * 只探測一次（結果快取），失敗時保留 fail-closed 驅動，不影響永豐流程。
+     */
+    connectBridge(driver: HttpEsunDriver = new HttpEsunDriver(bridgeBase())): Promise<EsunBridgeHealth | null> {
+        if (!this.bridgeProbe) {
+            this.bridgeProbe = (async () => {
+                try {
+                    const health = await driver.health(3_000);
+                    const accounts = await driver.accounts(3_000);
+                    this.bridgeHealth = health;
+                    this.setDriver(driver);
+                    for (const a of accounts) this.registerAccount(a);
+                    if (!health.configured || health.loginError) {
+                        console.warn('[esun] esun-bridge 已連線但尚未可下單：',
+                            health.loginError ?? health.problems.join('；'));
+                    }
+                    return health;
+                } catch {
+                    return null;
+                }
+            })();
+        }
+        return this.bridgeProbe;
+    }
+
+    getBridgeHealth(): EsunBridgeHealth | null {
+        return this.bridgeHealth;
     }
 
     private initFromEnv(): void {
