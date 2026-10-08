@@ -56,6 +56,7 @@ import { setServerIdentityVerified } from './server-identity';
 import { logNotice, notify } from './trade';
 import { isChildWindow } from './window-role';
 import { getServerModeVersion, knownServerInfo, subscribeServerInfo } from './server-info-store';
+import { isEsunAccount } from './esun';
 
 let booted = false;
 let tradingStarted = false;
@@ -511,6 +512,7 @@ export function subscribeTradeReports(): Promise<void> {
             const accounts = await loadAccountsShared();
             const query = createAccountQuery();
             for (const account of accounts.filter(a => canTrade(a))) {
+                if (isEsunAccount(account)) continue;
                 let subscribed = false;
                 try {
                     const health = await query.read(account.account_type as 'S' | 'F', account,

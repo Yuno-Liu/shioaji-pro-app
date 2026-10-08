@@ -9,7 +9,7 @@ import { markConfirmedCancellation, observeTradeMutation } from './trade-mutatio
 import { createCancelBatch, readMark, sharedAuthoritativeTrades, verifyCancellation, type CancelBatchMember } from './cancel-verification';
 import { observeMarketSnapshots } from './market-snapshot-store';
 import { observeTradeResponse } from './trade-observations';
-import { beginServerInfoRequest, observeServerInfo } from './server-info-store';
+import { beginServerInfoRequest, knownServerInfo, observeServerInfo } from './server-info-store';
 import { esunTradeService, isEsunAccount } from './esun';
 // src/lib/shioaji.ts
 
@@ -157,6 +157,7 @@ export async function subscribeTradeEvents(account: {
     account_id: string;
     account_type: string;
 }) {
+    if (isEsunAccount(account as Account)) return;
     const query = createAccountQuery();
     const current = query.account(account.account_type as AccountTypeName, account);
     return apiPost<unknown>('/api/v1/auth/subscribe_trade', {
@@ -1144,6 +1145,9 @@ function accountQueryPost<T>(path: string, type: AccountTypeName, selector?: Acc
         if (isEsunAccount(account as Account)) {
             if (path === '/api/v1/order/trades') {
                 return esunTradeService.fetchTrades(account as Account) as Promise<T>;
+            }
+            if (path === '/api/v1/order/trade_cache_health') {
+                return Promise.resolve({ ok: true, reasons: [] } as T);
             }
             if (ESUN_EMPTY_LIST_PATHS.has(path)) return Promise.resolve([] as T);
             return Promise.reject(new Error('玉山證券帳戶暫不支援此查詢'));
