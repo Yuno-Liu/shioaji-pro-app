@@ -36,13 +36,22 @@ export class EsunTradeService {
                 ? (import.meta as any).env
                 : undefined;
             const aid = env?.VITE_ESUN_ACCOUNT || env?.VITE_ESUN_AID;
-            const brokerId = env?.VITE_ESUN_BROKER_ID || ESUN_BROKER_CODE;
+            let brokerId = env?.VITE_ESUN_BROKER_ID;
+            let accountId = aid ? String(aid).trim() : '';
+            if (accountId && !brokerId) {
+                if (accountId.length === 11 && (accountId.startsWith('96') || accountId.startsWith('88'))) {
+                    brokerId = accountId.slice(0, 4);
+                    accountId = accountId.slice(4);
+                } else {
+                    brokerId = ESUN_BROKER_CODE;
+                }
+            }
             const username = env?.VITE_ESUN_USERNAME || ESUN_BROKER_NAME;
-            if (aid) {
+            if (accountId) {
                 this.registerAccount({
                     account_type: 'S',
-                    broker_id: String(brokerId),
-                    account_id: String(aid),
+                    broker_id: String(brokerId || ESUN_BROKER_CODE),
+                    account_id: accountId,
                     signed: true,
                     username: String(username),
                     person_id: '',

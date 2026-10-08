@@ -27,7 +27,8 @@ export function isEsunBroker(brokerId?: string | null): boolean {
         b === 'ESUNSEC' ||
         b === '玉山' ||
         b === ESUN_BROKER_NAME ||
-        b.startsWith('96')
+        b.startsWith('96') ||
+        b.startsWith('884')
     );
 }
 

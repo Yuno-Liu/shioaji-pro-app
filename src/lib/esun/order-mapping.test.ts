@@ -61,6 +61,8 @@ describe('isEsunBroker and isEsunAccount', () => {
         expect(isEsunBroker('E.SUN')).toBe(true);
         expect(isEsunBroker('玉山')).toBe(true);
         expect(isEsunBroker('玉山證券')).toBe(true);
+        expect(isEsunBroker('8840')).toBe(true);
+        expect(isEsunBroker('884M')).toBe(true);
 
         expect(isEsunBroker('9A95')).toBe(false);
         expect(isEsunBroker('Sinopac')).toBe(false);
