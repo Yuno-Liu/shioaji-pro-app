@@ -1,0 +1,16 @@
+services:
+  shioaji-pro-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shioaji-pro-app
+    restart: unless-stopped
+    ports:
+      # 將主機端口（預設 5173）映射至容器內的 Nginx 80 埠
+      - "${PORT:-5173}:80"
+    environment:
+      # 後端 Shioaji 服務位址（預設連線至宿主機上的 8080 埠）
+      - API_TARGET=${API_TARGET:-http://host.docker.internal:8080}
+    extra_hosts:
+      # 支援 Linux, Windows, macOS 容器透過 host.docker.internal 存取宿主機
+      - "host.docker.internal:host-gateway"

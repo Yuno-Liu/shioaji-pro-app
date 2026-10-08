@@ -1,0 +1,23 @@
+# ── 玉山證券 (E.SUN Securities) 程式交易 API 設定檔範例 ───────────
+# 請將本檔案複製為 config.ini 並填入你的真實資訊
+# 注意：切勿將包含真實憑證路徑或金鑰的 config.ini 提交至 Git 版本控制！
+
+[Core]
+# 模擬環境 API 入口網址
+Entry = https://esuntradingapi-simulation.esunsec.com.tw/api/v1
+# 正式環境 API 入口網址（上線真實交易請切換為此網址）
+# Entry = https://esuntradingapi.esunsec.com.tw/api/v1
+Environment = SIMULATION
+
+[Cert]
+# 玉山證券電腦下單憑證檔案路徑 (.p12 或 .pfx)
+Path = ./certs/your_esun_cert.p12
+
+[Api]
+# 玉山證券 API 金鑰 (在玉山程式交易平台線上申請取得)
+Key = your_api_key_here
+Secret = your_api_secret_here
+
+[User]
+# 完整玉山證券帳號 (分公司代碼 4 碼 + 帳號 7 碼，例如 96001234567)
+Account = 96001234567

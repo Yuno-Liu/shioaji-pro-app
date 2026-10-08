@@ -172,6 +172,137 @@ pnpm dev
 開啟 [http://localhost:5173](http://localhost:5173) —— dev server 會把
 `/api` 代理到 `localhost:8080`。
 
+## Docker 一鍵快速部署 Docker Quick Start
+
+本專案提供輕量化多階段 Dockerfile 與 Docker Compose 配置，無需在本地安裝 Node.js 或 pnpm，即可一鍵啟動整合 Nginx 與反向代理的完整交易終端：
+
+### 1. 一鍵啟動
+
+確認本機已安裝 [Docker](https://www.docker.com/) 與 Docker Compose，在專案目錄執行：
+
+```sh
+# 構建並於背景啟動終端服務
+docker compose up -d
+
+# 查看即時日誌
+docker compose logs -f
+```
+
+啟動後直接在瀏覽器打開 **[http://localhost:5173](http://localhost:5173)** 即可開始使用！
+
+### 2. 環境變數與自訂設定
+
+可在 `.env` 檔案中自訂連線設定，或於啟動時直接指定環境變數：
+
+| 環境變數 | 預設值 | 說明 |
+|---|---|---|
+| `PORT` | `5173` | 宿主機對外暴露之 Web 終端連接埠 |
+| `API_TARGET` | `http://host.docker.internal:8080` | 後端 Shioaji 服務連線網址（容器內部透過 `host.docker.internal` 連線宿主機 8080 埠） |
+
+例如自訂連接埠為 8080 或連接獨立主機：
+```sh
+PORT=8080 API_TARGET=http://192.168.1.100:8080 docker compose up -d
+```
+
+### 3. 停止與清理
+
+```sh
+docker compose down
+```
+
+## 玉山證券 (E.SUN Securities) 下單前準備與完整設定指南
+
+本終端已原生支援**玉山證券現貨台股下單與委託管理**（採用玉山官方 `@esun/trade` v2.2.0 Node.js SDK）。在進行實盤或模擬交易前，請依序完成以下準備與設定步驟：
+
+### 一、事前準備與開戶
+1. **開立玉山證券帳戶**：
+   - 需持有玉山證券有效證券戶（可為臨櫃開立之玉山證券戶，或玉山證券富果 Fugle 帳戶）。
+2. **開通電子下單權限與交易額度**：
+   - 確認證券戶已啟用電子交易功能與電子密碼。
+   - 依個人投資需求向營業員或線上申請足額的單日電子下單買賣額度。
+   - 若欲使用**現股當沖先賣（沖賣）**功能，請務必先簽署「現股當沖風險預告書」。
+
+### 二、申請程式交易 API 金鑰與設定 IP 白名單
+1. **前往玉山程式交易平台**：
+   - 瀏覽 [玉山證券程式交易 API 平台](https://www.esunsec.com.tw/trading-platforms/api-trading/) 並點擊登入。
+2. **簽署同意書與申請金鑰**：
+   - 線上簽署「API 服務申請同意書」開通開發者權限。
+   - 建立並取得交易專用的：
+     - **API Key**（金鑰公鑰）
+     - **API Secret**（金鑰私鑰，請妥善保管勿外流）
+3. **設定連線 IP 白名單**：
+   - 於金鑰管理頁面設定允許連線的來源 IP：
+     - 模擬環境：若使用本機浮動 IP 或雲端環境，可先加入本機公網 IP 或設定為 `0.0.0.0/0`（僅建議於測試環境使用）。
+     - 正式環境：請務必綁定固定公網 IP 確保交易資安。
+
+### 三、申請並匯出電腦下單憑證 (CA Certificate)
+依臺灣證券交易法規，所有電子交易委託均需數位憑證進行數位簽章：
+1. **申請/匯出憑證**：
+   - 登入玉山證券官網「憑證中心」，申請電腦下單憑證。
+   - 將憑證匯出為 **`.p12`** 或 **`.pfx`** 檔案格式。
+2. **憑證保護密碼**：
+   - 匯出憑證時會要求設定一組**憑證密碼**，請牢記此密碼（⚠️ 注意：憑證密碼與網銀/網路下單登入密碼不同）。
+3. **安全放置憑證**：
+   - 將憑證放置於本機安全目錄（例如專案目錄的 `certs/`：`./certs/your_esun_cert.p12`）。
+   - 本專案已在 `.gitignore` 與 `.dockerignore` 排除 `certs/`、`*.p12`、`*.pfx`，切勿將真實憑證上傳至 Git 倉庫。
+
+### 四、設定組態與連線參數
+
+玉山證券交易可透過 **`config.ini`** 或 **環境變數** 完成組態配置：
+
+#### 方式 A：使用標準 `config.ini`（推薦）
+將根目錄的 `esun-config.ini.example` 複製為 `config.ini`：
+```ini
+[Core]
+# 模擬環境 API 入口網址
+Entry = https://esuntradingapi-simulation.esunsec.com.tw/api/v1
+# 正式環境 API 入口網址（上線真實交易請切換為此網址）
+# Entry = https://esuntradingapi.esunsec.com.tw/api/v1
+Environment = SIMULATION
+
+[Cert]
+# 憑證檔案路徑 (.p12 或 .pfx)
+Path = ./certs/your_esun_cert.p12
+
+[Api]
+# 玉山證券 API 金鑰
+Key = your_esun_api_key
+Secret = your_esun_api_secret
+
+[User]
+# 完整證券帳號 (分公司代碼 4 碼 + 帳號 7 碼，例如 96001234567)
+Account = 96001234567
+```
+
+#### 方式 B：使用 `.env` 環境變數
+```sh
+# 前端自動帶入玉山帳號（9600 為玉山總公司，分公司代號如 96XX）
+VITE_ESUN_ACCOUNT=96001234567
+VITE_ESUN_BROKER_ID=9600
+VITE_ESUN_USERNAME=玉山證券
+
+# Node.js SDK 自動化參數 (免交互輸入密碼)
+ESUN_CONFIG_PATH=./config.ini
+ESUN_CERT_PASS=your_cert_password
+ESUN_PASSWORD=your_trading_password
+```
+
+### 五、下單支援規格與交易限制
+
+| 支援項目 | 說明與規則 |
+|---|---|
+| **交易市場** | 僅支援台股現貨市場（TWSE 上市 / TPEX 上櫃），**不支援** 期貨、選擇權或指數商品 |
+| **整股交易** | 交易單位為「張（1,000 股）」，支援市價（MKT）與限價（LMT），委託別 ROD/IOC/FOK |
+| **盤中零股** | 交易別為 `IntradayOdd`，單位為「股（1~999 股）」，僅限限價（LMT）與 ROD |
+| **盤後零股** | 交易別為 `Odd`，單位為「股（1~999 股）」，僅限限價（LMT）與 ROD |
+| **定價交易** | 交易別為 `Fixing`，以當日收盤定價進行撮合 |
+| **現股當沖先賣** | 支援 `daytrade_short`，需先向玉山證券開通現股當沖交易資格 |
+| **改單管理** | 支援委託減量（`replaceQuantity`）、改價（`replacePrice`）與全單撤銷（`cancelOrder`） |
+
+> ⚠️ **安全警告**：
+> 1. 初次使用請務必在**模擬環境 (SIMULATION)** 驗證完整連線、下單與改刪單流程。
+> 2. 正式環境中送出的每一筆委託均為市場真實撮合交易，請嚴格做好資金控管與風控停損設定。
+
 ## Deploy as a Shioaji custom app 部署為內建 App
 
 Shioaji server 可直接代管前端，build 完上傳即可：

@@ -21,3 +21,11 @@ dist/
 src-tauri/target/
 src-tauri/binaries/
 src-tauri/gen/schemas/
+
+# Certificates & Credentials
+*.p12
+*.pfx
+certs/
+key/
+config.ini
+

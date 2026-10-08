@@ -27,6 +27,30 @@ export class EsunTradeService {
 
     constructor(initialDriver?: IEsunTradeDriver) {
         this.driver = initialDriver ?? new MockEsunDriver();
+        this.initFromEnv();
+    }
+
+    private initFromEnv(): void {
+        try {
+            const env = (typeof import.meta !== 'undefined' && (import.meta as any).env)
+                ? (import.meta as any).env
+                : undefined;
+            const aid = env?.VITE_ESUN_ACCOUNT || env?.VITE_ESUN_AID;
+            const brokerId = env?.VITE_ESUN_BROKER_ID || ESUN_BROKER_CODE;
+            const username = env?.VITE_ESUN_USERNAME || ESUN_BROKER_NAME;
+            if (aid) {
+                this.registerAccount({
+                    account_type: 'S',
+                    broker_id: String(brokerId),
+                    account_id: String(aid),
+                    signed: true,
+                    username: String(username),
+                    person_id: '',
+                });
+            }
+        } catch {
+            // ignore non-vite environments
+        }
     }
 
     getDriver(): IEsunTradeDriver {

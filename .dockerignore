@@ -1,0 +1,27 @@
+# Git & system
+.git
+.gitignore
+.DS_Store
+
+# Dependencies & build
+node_modules
+dist
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment & local secrets
+.env
+.env.local
+.env.*.local
+*.p12
+*.pfx
+certs
+key
+config.ini
+
+# Tauri native builds
+src-tauri/target
+src-tauri/binaries
+src-tauri/gen
